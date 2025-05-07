@@ -13,118 +13,107 @@ const fileSize = 250; // 250MB
 const fileTypes = /jpeg|jpg|png|mp4|pdf/;
 const upload = multer({
     storage: multer.memoryStorage(),
-    limits: {
-        fileSize: (1024 * 1024 * fileSize) // 250 MB
-    },
-    fileFilter: async (req, file, cb) => {
-        // VALIDATE FILE EXT
-        const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
-        if (extname && file.mimetype) {
-            cb(null, true);
-        } else {
-            cb(new Error(`Only ${fileTypes.toString()} extentions are allowed!`), false);
-        }
+    limits: { fileSize: 1024 * 1024 * fileSize },
+    fileFilter: (req, file, cb) => {
+        const ext = fileTypes.test(path.extname(file.originalname).toLowerCase());
+        if (ext && file.mimetype) cb(null, true);
+        else cb(new Error(`Only ${fileTypes} extensions allowed`), false);
     }
 });
 
+// helper to override env from req.body
+function overrideEnv(fields) {
+  const keys = [
+    "PORT",
+    "META_API_URI",
+    "META_APP_ID",
+    "META_ACCESS_TOKEN",
+    "META_BUSINESS_ACC_ID"
+  ];
+  keys.forEach(k => {
+    if (fields[k] !== undefined) {
+      process.env[k] = fields[k];
+    }
+  });
+}
+
 // UPLOAD MEDIA ROUTE
-app.use('/uploadMedia', async (req, res) => {
-    // UPLOAD
-    upload.single('file')(req, res, async (error) => {
-        // PROBABLY FILE SIZE ERROR
-        if (error instanceof multer.MulterError) {
-            // LOG ERROR, AND RESPONSE
-            console.error(error);
-            res.status(400).send({
-                message: `Max file size ${fileSize} allowed!`
-            });
-        }
-        // SOMETHING OTHER ERROR 
-        else if (error) {
-            // LOG ERROR, AND RESPONSE
-            console.error(error);
-            res.status(400).send({
-                message: `Something went wrong please try again!`
-            });
-        }
-        // FILE IS REQUIRED
-        else if (!req.file) {
-            // LOG ERROR, AND RESPONSE
-            res.status(400).send({
-                message: `File is required!`
-            });
-        }
-        else {
-            // CREATE SESSION
-            let session = await WAHelper.RUCreateSession({
-                file_length: req.file.size,
-                file_name: req.file.originalname,
-                file_type: req.file.mimetype
-            });
-            if (session.body.error) {
-                // LOG ERROR, AND RESPONSE
-                console.error(session.body.error);
-                return res.status(400).send({
-                    message: session.body.error.error_user_title ? session.body.error.error_user_title + ` (${session.body.error.error_user_msg})` : session.body.error.message
-                });
-            }
-            //INITIATE UPLOAD
-            let iupload = await WAHelper.RUInitiateUpload(session.body.id, req.file.buffer);
-            if (iupload.body.h) {
-                // SUCCESS RESPONSE
-                console.error(iupload.body);
-                return res.status(200).send({
-                    message: "Uploaded!",
-                    body: iupload.body
-                });
-            }
-            // ERROR
-            else if (iupload.body.error) {
-                // LOG ERROR, AND RESPONSE
-                console.error(iupload.body.error);
-                return res.status(400).send({
-                    message: iupload.body.error.error_user_title ? iupload.body.error.error_user_title + ` (${iupload.body.error.error_user_msg})` : iupload.body.error.message
-                });
-            }
-            else {
-                // LOG ERROR, AND RESPONSE
-                console.error(iupload);
-                return res.status(400).send({
-                    message: "Something went wrong please try again!"
-                });
-            }
-        }
-    });
+app.post('/uploadMedia', (req, res) => {
+  upload.single('file')(req, res, async (err) => {
+    if (err) {
+      const msg = err instanceof multer.MulterError
+        ? `Max file size ${fileSize}MB exceeded`
+        : "Something went wrong, please try again";
+      return res.status(400).json({ message: msg });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "File is required" });
+    }
+
+    // Override process.env with any form‑fields
+    overrideEnv(req.body);
+
+    try {
+      // Create session using current process.env values
+      const session = await WAHelper.RUCreateSession({
+        file_length: req.file.size,
+        file_name:   req.file.originalname,
+        file_type:   req.file.mimetype
+      });
+      if (session.body.error) {
+        throw session.body.error;
+      }
+
+      const iupload = await WAHelper.RUInitiateUpload(
+        session.body.id,
+        req.file.buffer
+      );
+      if (iupload.body.h) {
+        return res.status(200).json({
+          message: "Uploaded!",
+          body:    iupload.body
+        });
+      }
+      throw iupload.body.error || new Error("Unknown upload error");
+    }
+    catch (e) {
+      const userMsg = e.error_user_title
+        ? `${e.error_user_title} (${e.error_user_msg})`
+        : e.message;
+      console.error(e);
+      return res.status(400).json({ message: userMsg });
+    }
+  });
 });
 
 // CREATE TEMPLATE
-app.use('/createTemplate', async (req, res) => {
-    let template = await WAHelper.createWABANOTemplates(req.body);
+app.post('/createTemplate', async (req, res) => {
+  // Override env here too, if needed:
+  overrideEnv(req.body);
+
+  try {
+    const template = await WAHelper.createWABANOTemplates(req.body);
     if (template.body.id) {
-        return res.status(200).send({
-            message: "Template Created!",
-            body: template.body
-        });
+      return res.status(200).json({
+        message: "Template Created!",
+        body:    template.body
+      });
     }
-    // ERROR
-    else if (template.body.error) {
-        // LOG ERROR, AND RESPONSE
-        console.error(template.body.error);
-        return res.status(400).send({
-            message: template.body.error.error_user_title ? template.body.error.error_user_title + ` (${template.body.error.error_user_msg})` : template.body.error.message
-        });
-    }
-    // LOG ERROR, AND RESPONSE
-    console.error(template);
-    return res.status(400).send({
-        message: "Something went wrong please try again!"
-    });
+    throw template.body.error || new Error("Unknown template error");
+  }
+  catch (e) {
+    const userMsg = e.error_user_title
+      ? `${e.error_user_title} (${e.error_user_msg})`
+      : e.message;
+    console.error(e);
+    return res.status(400).json({ message: userMsg });
+  }
 });
 
 // SERVER LISTEN
-const port = process.env.PORT;
+const port = process.env.PORT || 3000;
 app.listen(port, () => {
-    console.info(`Listening on port ${port}...`)
-}).on("error", (err) => {
-    console.error(err.message);
+  console.info(`Listening on port ${port}`);
+}).on("error", err => {
+  console.error(err.message);
 });
