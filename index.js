@@ -4,6 +4,9 @@ const app = express();
 app.use(express.json({ limit: "100mb" }));
 app.use(express.urlencoded({ limit: "100mb", extended: true }));
 
+// health‑check endpoint for Render
+app.get('/healthz', (req, res) => res.sendStatus(200));
+
 const WAHelper = require("./whatsapp.helper");
 const path = require("path");
 const multer = require("multer");
@@ -21,60 +24,45 @@ const upload = multer({
     }
 });
 
-// helper to override env from req.body
+// helper to override env from form fields
 function overrideEnv(fields) {
-  const keys = [
-    "PORT",
-    "META_API_URI",
-    "META_APP_ID",
-    "META_ACCESS_TOKEN",
-    "META_BUSINESS_ACC_ID"
-  ];
-  keys.forEach(k => {
-    if (fields[k] !== undefined) {
-      process.env[k] = fields[k];
-    }
-  });
+  ["PORT","META_API_URI","META_APP_ID","META_ACCESS_TOKEN","META_BUSINESS_ACC_ID","API_KEY"]
+    .forEach(k => { if (fields[k] !== undefined) process.env[k] = fields[k]; });
 }
 
-// UPLOAD MEDIA ROUTE
+// simple API‑key middleware
+app.use((req, res, next) => {
+  const token = req.headers.authorization?.split(' ')[1];
+  if (token !== process.env.API_KEY) return res.status(401).json({ message: "Unauthorized" });
+  next();
+});
+
+// UPLOAD MEDIA
 app.post('/uploadMedia', (req, res) => {
-  upload.single('file')(req, res, async (err) => {
+  upload.single('file')(req, res, async err => {
     if (err) {
       const msg = err instanceof multer.MulterError
         ? `Max file size ${fileSize}MB exceeded`
-        : "Something went wrong, please try again";
+        : "Something went wrong";
       return res.status(400).json({ message: msg });
     }
-    if (!req.file) {
-      return res.status(400).json({ message: "File is required" });
-    }
+    if (!req.file) return res.status(400).json({ message: "File is required" });
 
-    // Override process.env with any form‑fields
     overrideEnv(req.body);
 
     try {
-      // Create session using current process.env values
       const session = await WAHelper.RUCreateSession({
         file_length: req.file.size,
         file_name:   req.file.originalname,
         file_type:   req.file.mimetype
       });
-      if (session.body.error) {
-        throw session.body.error;
-      }
+      if (session.body.error) throw session.body.error;
 
-      const iupload = await WAHelper.RUInitiateUpload(
-        session.body.id,
-        req.file.buffer
-      );
+      const iupload = await WAHelper.RUInitiateUpload(session.body.id, req.file.buffer);
       if (iupload.body.h) {
-        return res.status(200).json({
-          message: "Uploaded!",
-          body:    iupload.body
-        });
+        return res.status(200).json({ message: "Uploaded!", body: iupload.body });
       }
-      throw iupload.body.error || new Error("Unknown upload error");
+      throw iupload.body.error || new Error("Upload failed");
     }
     catch (e) {
       const userMsg = e.error_user_title
@@ -88,18 +76,11 @@ app.post('/uploadMedia', (req, res) => {
 
 // CREATE TEMPLATE
 app.post('/createTemplate', async (req, res) => {
-  // Override env here too, if needed:
   overrideEnv(req.body);
-
   try {
     const template = await WAHelper.createWABANOTemplates(req.body);
-    if (template.body.id) {
-      return res.status(200).json({
-        message: "Template Created!",
-        body:    template.body
-      });
-    }
-    throw template.body.error || new Error("Unknown template error");
+    if (template.body.id) return res.status(200).json({ message: "Template Created!", body: template.body });
+    throw template.body.error || new Error("Template failed");
   }
   catch (e) {
     const userMsg = e.error_user_title
@@ -112,8 +93,4 @@ app.post('/createTemplate', async (req, res) => {
 
 // SERVER LISTEN
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-  console.info(`Listening on port ${port}`);
-}).on("error", err => {
-  console.error(err.message);
-});
+app.listen(port, () => console.info(`Listening on port ${port}`));
