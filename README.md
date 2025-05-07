@@ -86,3 +86,184 @@ curl --location 'http://localhost:2002/createTemplate' \
 
 ## Reference
 https://developers.facebook.com/docs/graph-api/guides/upload/
+
+
+
+
+
+**Providing GitHub deployment guide**
+
+The user needs a step-by-step guide for deploying their GitHub repo on Render. I need to include several specific details: New Web Service with their public Git repository, build and start commands, environment variables, how to add a subdomain via an A record, and info about the input data field name 'data' in n8n. I'll also offer two deployment options, either direct deployment or via Google Form automation, and a n8n template link. Of course, I'll need to search for specific citations like the Render A record IP.
+
+
+Thought for 4 seconds
+
+
+Here’s the **ultimate guide** (in English) to deploying your existing fork — **JimPresting/meta-resumable-upload-api** — on Render, plus two ways to expose it (direct HTTP service or Google Form automation), setting up a subdomain, API Key auth, and the final `curl` to test.
+
+---
+
+## Two Deployment Options
+
+1. **Self‑hosted on Render** (detailed below)
+2. **Google Form → n8n → Render** (automated file‑upload service; template link at the end)
+
+---
+
+# 1. Self‑Host on Render
+
+### 1.1. Create a New Web Service
+
+1. Log in to Render and click **New → Web Service**.
+2. Choose **Public Git repository**.
+3. Paste your repo URL:
+
+   ```
+   https://github.com/JimPresting/meta-resumable-upload-api
+   ```
+4. Click **Continue**.
+
+### 1.2. Configure Build & Start
+
+| Setting        | Value           |
+| -------------- | --------------- |
+| Environment    | Node            |
+| Branch         | main            |
+| Build Command  | `npm install`   |
+| Start Command  | `node index.js` |
+| Root Directory | *(leave blank)* |
+
+*Render automatically sets* `PORT` *to an ephemeral port (10000 in your logs).* ([Render][1])
+
+### 1.3. Add Environment Variables (Defaults)
+
+1. Go to the **Environment** tab.
+2. Click **Add Environment Variable** for each key from your README:
+
+   ```
+   PORT=2002
+   META_API_URI=https://graph.facebook.com/v14.0
+   META_APP_ID=xxxxxxx
+   META_ACCESS_TOKEN=xxxxxxx
+   META_BUSINESS_ACC_ID=xxxxxxx
+   ```
+3. Click **Save, rebuild, and deploy**.
+
+### 1.4. Add API Key Auth
+
+1. In the same **Environment** tab, add:
+
+   ```
+   API_KEY=d6bd63a37f727c74712cc68d197c51a5
+   ```
+2. Click **Save, rebuild, and deploy**.
+
+*Your code checks* `Authorization: Bearer <API_KEY>`.
+
+### 1.5. Verify the Service
+
+* Wait for “Live” in the **Deploys** tab.
+* Confirm logs:
+
+  ```
+  Listening on port 10000
+  ```
+* Your Render URL is now:
+
+  ```
+  https://meta-resumable-upload-api.onrender.com
+  ```
+
+---
+
+# 2. (Optional) Add Custom Subdomain
+
+1. In your service’s **Settings → Custom Domains**, click **+ Add Custom Domain**.
+
+2. Enter your domain, e.g. `watemplate.stardawnai.com` and **Verify**. ([Render][1])
+
+3. At your DNS provider, add:
+
+   * **Type**: A
+   * **Name**: `watemplate` (for watemplate.stardawnai.com)
+   * **Value**: `216.24.57.1` ([Render][2])
+
+4. Wait for verification. SSL is automatic.
+
+5. Your new endpoint:
+
+   ```
+   https://watemplate.stardawnai.com/uploadMedia
+   ```
+
+---
+
+# 3. Test with curl
+
+```bash
+curl -X POST https://watemplate.stardawnai.com/uploadMedia \
+  -H "Authorization: Bearer d6bd63a37f727c74712cc68d197c51a5" \
+  -F "file=@/path/to/your/file.pdf" \
+  -F "META_APP_ID=1234567890" \
+  -F "META_ACCESS_TOKEN=EAAXXX..." \
+  -F "META_BUSINESS_ACC_ID=9876543210" \
+  -F "META_API_URI=https://graph.facebook.com/v14.0" \
+  -F "PORT=10000"
+```
+
+---
+
+# 4. n8n Template
+
+In n8n, use an **HTTP Request** node:
+
+* **Method**: POST
+* **URL**: `https://watemplate.stardawnai.com/uploadMedia`
+* **Body Content Type**: `multipart/form-data`
+
+**Binary Parameter**
+
+| Name | Input Data Field Name |
+| ---- | --------------------- |
+| file | data                  |
+
+**Form Parameters**
+
+| Key                     | Value/Expression                    |
+| ----------------------- | ----------------------------------- |
+| META\_APP\_ID           | `={{ $json["metaAppId"] }}`         |
+| META\_ACCESS\_TOKEN     | `={{ $json["metaAccessToken"] }}`   |
+| META\_BUSINESS\_ACC\_ID | `={{ $json["metaBusinessAccId"] }}` |
+| META\_API\_URI          | `=https://graph.facebook.com/v14.0` |
+| PORT                    | `=10000`                            |
+
+> Use **data** as Input Data Field Name so the binary from your Google Drive node is sent as `file`.
+
+You can import this sample workflow via n8n’s import feature:
+
+```
+[ n8n workflow JSON placeholder – replace with your actual template link ]
+```
+
+---
+
+# 5. Alternative: Google Form → n8n → Render
+
+1. Create a **Google Form** with a File Upload field + text fields for your META\_ vars.
+2. In n8n, trigger on **Google Forms** submission.
+3. Map the Form fields into the **HTTP Request** node as above.
+4. Files submitted via the form auto‑forward to your Render service.
+
+This gives a no‑code front‑end for non‑technical users.
+
+---
+
+You now have a complete, secure, and flexible deployment—either direct HTTP API or via Google Form automation.
+
+[1]: https://render.com/docs/custom-domains?utm_source=chatgpt.com "Custom Domains on Render"
+[2]: https://render.com/docs/configure-other-dns?utm_source=chatgpt.com "Configuring DNS Providers – Render Docs"
+
+
+
+
+
