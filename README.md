@@ -193,7 +193,7 @@ Here’s the **ultimate guide** (in English) to deploying your existing fork �
 5. Your new endpoint:
 
    ```
-   https://watemplate.stardawnai.com/uploadMedia
+   https://watemplate.yourdomain.com/uploadMedia
    ```
 
 ---
@@ -201,7 +201,7 @@ Here’s the **ultimate guide** (in English) to deploying your existing fork �
 # 3. Test with curl
 
 ```bash
-curl -X POST https://watemplate.stardawnai.com/uploadMedia \
+curl -X POST https://watemplate.yourdomain.com/uploadMedia \
   -H "Authorization: Bearer d6bd63a37f727c74712cc68d197c51a5" \
   -F "file=@/path/to/your/file.pdf" \
   -F "META_APP_ID=1234567890" \
@@ -210,7 +210,7 @@ curl -X POST https://watemplate.stardawnai.com/uploadMedia \
   -F "META_API_URI=https://graph.facebook.com/v14.0" \
   -F "PORT=10000"
 ```
-
+He will simply overwrite the .env! Doing it like this, you can use it for multiple WABA's!
 ---
 
 # 4. n8n Template
