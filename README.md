@@ -249,10 +249,12 @@ You can import this sample workflow via n8n’s import feature:
 
 # 5. Alternative: Google Form → n8n → Render
 
-1. Create a **Google Form** with a File Upload field + text fields for your META\_ vars.
-2. In n8n, trigger on **Google Forms** submission.
-3. Map the Form fields into the **HTTP Request** node as above.
-4. Files submitted via the form auto‑forward to your Render service.
+A service I built to simplify setup, requiring trust with your credentials.  
+1. Create an "account": [Link](https://forms.gle/vvi6vUQd7YPfkU5X8)  
+2. Create a template: [Link](https://forms.gle/MnPQ9AQ8n2F8AosX8)  
+
+Note: This creates a basic template using one of three document-related options, editable later in WhatsApp Business Manager.
+
 
 This gives a no‑code front‑end for non‑technical users.
 
