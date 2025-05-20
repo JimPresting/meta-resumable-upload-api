@@ -180,13 +180,13 @@ Here’s the **ultimate guide** (in English) to deploying your existing fork �
 
 1. In your service’s **Settings → Custom Domains**, click **+ Add Custom Domain**.
 
-2. Enter your domain, e.g. `watemplate.stardawnai.com` and **Verify**. ([Render][1])
+2. Enter your domain, e.g. `watemplate.yourdomain.com` and **Verify**. ([Render][1])
 
 3. At your DNS provider, add:
 
    * **Type**: A
-   * **Name**: `watemplate` (for watemplate.stardawnai.com)
-   * **Value**: `216.24.57.1` ([Render][2])
+   * **Name**: `watemplate` (for watemplate.yourdomain.com)
+   * **Value**: `YOUREXTERNALIP` ([Render][2])
 
 4. Wait for verification. SSL is automatic.
 
