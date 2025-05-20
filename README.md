@@ -218,7 +218,7 @@ He will simply overwrite the .env! Doing it like this, you can use it for multip
 In n8n, use an **HTTP Request** node:
 
 * **Method**: POST
-* **URL**: `https://watemplate.stardawnai.com/uploadMedia`
+* **URL**: `https://watemplate.yourdomain.com/uploadMedia`
 * **Body Content Type**: `multipart/form-data`
 
 **Binary Parameter**
